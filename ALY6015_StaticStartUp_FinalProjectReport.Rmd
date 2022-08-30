@@ -1,0 +1,593 @@
+---
+output:
+  pdf_document: default
+  word_document: default
+---
+![](/Users/jillienchu/Desktop/Courses/Winter 2022/ALY6015/NEU_Logo.png)
+
+
+
+\begin{centering}
+\Large
+
+Northeastern University 
+
+Instructor: Dr. Vladimir Shapiro 
+
+Date:20th February, 2022
+
+\end{centering}
+
+
+
+# Introduction
+
+Basketball is a beloved sport across the globe and can be played by anyone. These games are played not only for entertainment but also for the fans who are passionate about this game. In such a case, it has become imperative for fans and the team's management to watch out for their favorite player's or team's statistics in terms of their previous game or against their opponent. Women’s basketball is no different and is only gaining more popularity each day. For our project, I intend to explore and identify the different patterns for the winning team statistics and understand the mindsets of the professional Women NBA players.
+
+The WNBA 2014 data set used in this analysis was chosen from Sports Statistics. From this analysis, I intend to answer the following business queries: 
+
+* What is the effect of a player's overall match statistics on a player's future efficiency?
+* What is the effect of a team's overall match statistics on a team winning the game?
+
+To conduct the analyses for the above research queries, predictive models such as the linear regression model and the logistic regression model will be used. 
+
+Regression tests are conducted to find the cause-and-effect relationships. These tests are performed to get an estimation on the effect of one or more continuous variables with another variable. 
+
+A Linear Regression Model predicts the value of a variable based on another variable's value. It uses a straight line to display the relationship between the variables. The variable that is predicted is known as the dependent variable and the variable that is being used to predict the dependent variable is known as the independent variable. There are two types of linear regression. They are the Simple Linear Regression and Multiple Linear Regression. In our analysis, we will be working with the Multiple Linear Regression Model.
+
+A Logistic Regression Model is used to understand the relationship between the dependent variable and one or more than one independent variables and helps us in predicting the likelihood of an event. In this model, the dependent variable is a categorical or a finite variable.
+
+The WNBA dataset variables that were considered for this analysis were:
+
+```{r, message = FALSE, echo = FALSE}
+library(knitr)
+
+df <- data.frame(bucket = 1:26,
+                 Variable_Name = c("Player", "player_id", "team", "date", "home", "opponent", "tin", "team_pts", "opp_pts", "minutes", "fgmade", "fgatt", "made3", "att3", "made1", "att1", "offrb", "defrb", "totrb", "assist", "steal", "block", "turnover", "fouls", "points", "efficiency"), Description = c("Name of the Player", "Player ID", "Team Name", "Date of the Game", "Home or Away", "Opponent Team Name", "Win or Loss", "Total Team Points", "Total Opponent Points", "Number of minutes played by a player", "Field Goals", "Field Goal Attempts", "Number of 3 pointers made", "Number of 3 pointer attempts", "Number of 1 pointers made", "Number of 1 pointer attempts", "Offensive Rebound", "Defensive Rebound", "Total Rebounds", "Number of assists", "Number of steals", "Number of blocks", "Number of turnovers", "Number of fouls", "Total Player Points", "Player Efficiency"), Data_Type = c("Factor", "Integer", "Factor", "Integer", "Integer", "Factor", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer"))
+
+kable(df)
+```
+
+
+# Methods
+
+## BQ1 -> What is the effect of a player's overall match statistics on a player's future efficiency?
+
+To answer the above question, the multiple linear regression was used. This method was chosen to estimate or predict the player's efficiency with respect to her previous game statistics. 
+
+In this model, the efficiency of the player is the dependent variable and the variables  assist, fouls, turnover, made1 and fgmade are the independent variables. To make this model, the player's statistics was subsetted and the necessary assumptions were checked i.e., the check for multicollinearity, linearity, normal distribution of the dependent variable and the homoscedasticity. 
+
+
+## BQ2 -> What is the effect of a team's overall match statistics on a team winning the game?
+
+To answer the above question, the Logistic Regression Model was chosen. Since we wanted to determine the probability that a team would win the game and there are only two possible results i.e., win or lose, this model was appropriate to answer our question. Since the logistic regression model returns a probability between 0 and 1, we will need to decide on the limit that will be considered as a win or loss. If the probability from our model is greater than 0.5, then it'll be considered as a win and vice versa. 
+
+In this model, the efficiency of the player is the dependent variable and the variables team_pts, home, efficiency, fgmade and assist  are the independent variables.
+
+
+```{r}
+library(stargazer)
+library(psych)
+library(DataExplorer)
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+library(ggpubr)
+library(dplyr)
+library(car)
+library(pROC)
+library(caret)
+library(AICcmodavg)
+library(leaps)
+library(magrittr)
+library(lmtest)
+```
+
+
+```{r}
+#Importing the dataset
+WNBA <- read.csv("/Users/jillienchu/Desktop/Courses/Winter 2022/ALY6015/Project/WNBA.csv")
+```
+
+
+
+```{r fig.cap="Information of the WNBA data set", fig.align='center'}
+#Exploring the data set
+plot_intro(WNBA, title = "Basic Information of the Data Set", ggtheme = theme_gray())
+```
+
+From the above, we can infer that there are 23% discrete and 77% continuous columns in the data set. The total data set consisted of 7.1% observations that were missing, and all the missing columns totaled up to 3.6%. 
+
+```{r fig.cap="Missing values of the WNBA data set", fig.align='center'}
+plot_missing(WNBA, title = "Visualization of Missing Values", ggtheme = theme_gray())
+```
+
+From the above plot, I find that the column X and X.1 have missing values. After further analysis, it was found that this could have occurred due to a data set entry error. Thus, these two columns have been removed from our analysis as it doesn't provide any additional information. 
+
+```{r}
+#Removing Columns X and X.1
+WNBA$X <- NULL
+WNBA$X.1 <- NULL
+
+#Check for duplicate values
+WNBA[duplicated(WNBA),]
+```
+
+From the above outputs, it is clear that there are no duplicates in the data set. 
+
+```{r}
+#Replacing data entry errors with the correct values
+WNBA$opp_pts = gsub('-100', '100', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-102', '102', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-105', '105', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-107', '107', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-108', '108', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-112', '112', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-74', '74', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-78', '78', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-82', '82', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-85', '85', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-88', '88', WNBA$opp_pts)
+WNBA$opp_pts = gsub('-99', '99', WNBA$opp_pts)
+WNBA$team_pts[3814] <- 112
+WNBA$team_pts[3838] <- 112
+WNBA$team_pts[3885] <- 112
+WNBA$team_pts[3437] <- 101
+WNBA$team_pts[3558] <- 105
+WNBA$team_pts[3574] <- 105
+WNBA$team_pts[4000] <- 107
+WNBA$team_pts[3475] <- 100
+WNBA$team_pts[3716] <- 100
+WNBA$team_pts[3653] <- 102
+WNBA$team_pts[3537] <- 108
+WNBA$team_pts[3934] <- 101
+WNBA$team_pts[3960] <- 101
+WNBA$team_pts[3888] <- 100
+WNBA$team_pts[3907] <- 100
+WNBA$team_pts[3553] <- 101
+WNBA$team_pts[3895] <- 101
+WNBA$team_pts[3912] <- 101
+WNBA$team_pts[3769] <- 102
+WNBA$team_pts[3805] <- 102
+WNBA$team_pts[3982] <- 105
+WNBA$team_pts[3999] <- 105
+WNBA$team_pts[3569] <- 101
+WNBA$team_pts <- as.integer(WNBA$team_pts)
+WNBA$opp_pts <- as.integer(WNBA$opp_pts)
+```
+
+Replaced the incorrect data entry values with the correct values above.
+
+
+```{r}
+#Descriptive Statistics of the Data set 
+stargazer(WNBA, type = "text", title = "Descriptive Statistics of the Data Set", header = FALSE, single.row = TRUE)
+describe(WNBA)
+str(WNBA)
+```
+From the descriptive statistics, we infer that our analysis will consist of 4032 observations and 26 variables in total. The stargazer function displays the mean, median, quartiles, standard deviation, minimum and maximum values for each variable in this dataset. From this, we observe that this dataset holds data for 152 players across 12 teams. The team points ranged between 46 and 112 whereas, the opponent points ranged between 46 and 112. The longest time a player played a match was for 52 minutes. The minimum points a player scored in a game was 0 and the maximum points a player scored in a game was 48. The efficiency of these players ranged between -7 and 44. 
+
+
+```{r fig.cap="Discrete Variable based on 'win'", fig.align='center'}
+plot_bar(WNBA, by= "win", title = "Discrete Variable based on the variable 'win'")
+```
+
+From the above plot, we can infer that there was approximately 60% of home games were won. 
+
+```{r fig.cap="Histograms for the WNBA data set", fig.align='center'}
+plot_histogram(WNBA, title = "Histograms of each feature in the dataset")
+```
+
+From the above plots, we can observe that team_pts, opp_pts and efficiency are normally distributed. 
+
+
+```{r fig.cap="Correlation Matrix of the WNBA Data Set"}
+plot_correlation(na.omit(WNBA), type = c("continuous"), ggtheme = theme_gray(), title = "Correlation of the Data Set")
+```
+
+From the above matrix, we notice that there are a couple of variables that are correlated to each other. The variables 'minutes' and 'fgmade', 'minutes' and 'fgatt', 'fgmade' and 'fgatt', 'minutes' and 'points', 'minutes' and 'efficiency', 'fgmade' and 'points', 'fgmade' and 'efficiency', 'fgatt' and 'points', 'fgatt' and 'efficiency', 'made3' and 'att3', 'made1' and 'att1', 'offrb' and 'totrb', and 'defrb' and 'totrr' have a strong positive correlation. As such, another correlation plot is made to gain a better understanding of the data set. 
+
+```{r}
+che <- WNBA[, c("win", "team_pts", "points", "efficiency", "fgmade", "fgatt", "made3", "att3", "made1", "att1", "offrb", "defrb", "totrb")]
+pairs.panels(che, method = "pearson", hist.col = "blue", density = TRUE, ellipses = TRUE)
+```
+
+From the above, it was found that 'points' and 'efficiency', 'points' and 'fgmade', 'points' and 'fgatt', 'efficiency' and 'fgmade', 'efficiency' and 'fgatt', 'fgmade' and 'fgatt', 'made3' and 'att3', 'points' and 'made1', 'efficiency' and 'made1', 'fgatt' and 'made1', 'points' and 'att1', 'efficiency' and 'att1', 'fgatt' and 'att1', 'made1' and 'att1', 'efficiency' and 'defrb', 'fgmade' and 'totrb', 'fgatt' and 'totrb', 'defrb' and 'totrb', 'offrb' and 'totrb' as well as 'efficiency' and 'totrb' have a strong positive correlation. 
+
+
+```{r fig.cap="Best players in the ATL team based on their points and efficiency"}
+#Best players in a particular team
+options(repr.plot.width = 12, repr.plot.height = 8)
+
+WNBA %>% 
+  filter(team == "LAS") %>% 
+  select(Player, points, efficiency) %>%
+  arrange(-points) %>% 
+  head(5) %>% 
+  gather(variable, Exp, -Player) %>% 
+  ggplot(aes(Player, Exp, fill = variable))+
+  geom_col(position = "dodge")+
+  geom_text(aes(label = Exp),position = position_dodge(width = 0.9), vjust = -0.5)+
+  scale_fill_manual(values = c("#DA291C", "#004170"))+
+  theme_minimal()+
+  theme(legend.position = "right")+
+  labs(y = "Points", x = "Players", title = "Best Players in LAS")
+```
+
+From the above plot, it can be observed that Candace Parker was the best player for the team LAS with the highest scored points of 34 followed by Nneka Ogwumike and Kristi Toliver. Also, the best player based on efficiency was Nneka Ogwumike followed by Candace Parker and Kristi Toliver. 
+
+
+# Analysis
+
+## Exploratory Data Analysis
+
+## Business Question 1 - What is the effect of a player's overall match statistics on a player's future efficiency?
+
+
+### Motivation
+
+A player's efficiency changes according to a number of factors. I wanted to explore the data and find the best predictors for our target variable (efficiency) that will estimate the future efficiency of the players. To find the prediction, I chose the multiple linear regression model. 
+
+### Research
+
+The focus of this research was to build an accurate predictive model that would estimate the efficiency of a player with a high accuracy. As an essential part of building such a model, I aimed to provide answers to the following questions:
+
+* Which features or statistics are the most useful for estimating the future efficiency of a player?
+
+
+### Development
+
+The data used for this research was a subset of Maya Moore's player statistics from the WNBA dataset. It consisted of all her match statistics of every single game she played. The variables that were considered for this model were:
+
+```{r, message = FALSE, echo = FALSE}
+library(knitr)
+
+df <- data.frame(bucket = 1:10,
+                 Variable_Name = c("fgmade", "made3", "made1", "att1", "assist", "steal", "block", "fouls", "turnover", "efficiency"), Description = c("Field Goals", "Number of 3 pointers made", "Number of 1 pointers made", "Number of 1 pointer attempts", "Number of Assists", "Number of Steals", "Number of Blocks", "Number of Fouls", "Number of Turnovers", "Player Efficiency"), Data_Type = c("Integer", "Integer", "Integer",  "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer"))
+
+kable(df)
+```
+
+
+
+### Code
+
+```{r}
+Maya <- WNBA %>% filter(Player == "Maya Moore" ) %>% select(efficiency, assist, steal, block, fouls, turnover, made1, made3, fgmade, att1)
+```
+The data set was subsetted with the player Maya Moore game statistics. 
+
+```{r}
+efficiency <- Maya$efficiency
+assist <- Maya$assist
+steal <- Maya$steal
+block <- Maya$block
+fouls <- Maya$fouls
+turnover <- Maya$turnover
+made1 <- Maya$made1
+made3 <- Maya$made3
+fgmade <- Maya$fgmade
+att1 <- Maya$att1
+```
+
+```{r fig.cap="Scatterplots with efficiency"}
+par(mfrow=c(2,2))
+scatterplot(efficiency~assist,data=Maya)
+scatterplot(efficiency~fgmade,data=Maya)
+scatterplot(efficiency~turnover,data=Maya)
+scatterplot(efficiency~made1,data=Maya)
+```
+The above scatter plots represents the variables efficiency with assist, fgmade, turnover and made1. From these plots, it was inferred that the variables had a positive linear relationship.
+
+```{r fig.cap="Correlation of Maya Moore's game statistics"}
+cors2 <- cor(Maya[, c('efficiency','assist','steal','block','fouls','turnover','made1', 'made3', 'fgmade')])
+#corrplot(cors,col="blue",addCoef.col = "black")
+plot_correlation(na.omit(cors2), type = c("continuous"), ggtheme = theme_gray(), title = "Correlation of a player's game statistics")
+```
+
+The correlation matrix represents the correlation between efficiency, assist, steal, block, fouls, turnover, made1, made3 and fgmade. From this matrix, it can be observed that the correlation between 'efficiency' and 'fgmade', 'efficiency' and 'made3', 'efficiency' and 'made1', 'fgmade' and 'made1', 'efficiency' and 'made3', and 'fgmade' and 'made3' have strong positive relationships. The variables 'fgmade' and 'assist', 'made3' and 'assist', 'turnover' and 'assist', as well as 'block' and 'steal' have strong negative relationships.
+
+
+```{r}
+fit1 <- lm(efficiency ~., data = Maya)
+summary(fit1)
+```
+
+The above predictive model represents all the game statistics of Maya Moore. From this, it can be understood that the variables 'fgmade', 'assist', 'turnover' and 'made1' are significant to estimate the efficiency of the player.
+
+```{r}
+AIC(fit1)
+BIC(fit1)
+```
+The AIC of the above model was 191.0581 and the BIC was 207.848.
+
+```{r}
+fit2 <- lm(efficiency ~ fgmade + made1 + turnover + assist, data = Maya)
+summary(fit2)
+```
+The multiple linear regression model represents the estimation of efficiency. The equation to estimate efficiency is efficiency = (2.2233)fgmade + (1.1459)made1 + (-0.6957)turnover + (1.1090)assist - 1.0648.The regression model, shows that the adjusted R-squared is 0.8586 which indicates that 85.86% of the variance in efficiency can be estimated by 'fgmade', 'made1', 'turnover' and 'assist'. From the above model, it can be interpreted that the 'efficiency' increases by 1 unit when 'fgmade' increases by a factor of 2.2233 provided there is no change in the other predictor variables. Likewise, 'efficiency' will increase by 1 unit when 'made1' increases by a factor of 1.1459 or when 'turnover' increases by a factor of -0.6957 or when 'assist' increases by a factor of 1.1090.
+
+
+```{r}
+AIC(fit2)
+BIC(fit2)
+```
+The AIC of the above model was 189.5366 and the BIC was 198.6948.
+
+```{r}
+par(mfrow=c(2,2))
+plot(fit2)
+```
+
+The first type of plot represents the residual vs fitted plot. This plot depicts if the residuals have any non-linear pattern. From this, I noticed that the red line deviated very slightly from the horizontal line. Thus, the residuals followed a linear pattern and the linear regression model was appropriate for this data set. The second plot represents the Normal Q-Q plot which determines if the residuals are normally distributed. From the Q-Q Plot, it was inferred that the data was roughly on the diagonal line. Thus, the residuals was not enough to declare that it was non-normally distributed. The third type of plot represents the Scale-Location Plot. It is used to check the assumption of homoscedasticity among the residuals. In this plot, the red line wasn’t horizontal across the plot and showed the red line was moving upwards which indicated that the residuals spread wider on the x-axis. The fourth type of plot is the residuals vs leverage plot which is used to find the unusual observations. This plot displayed that there wasn't any data in the 1 or 0.5 area which indicated that there was no outliers or observations that needed extra attention.
+
+
+```{r}
+crPlots(model=fit2)
+spreadLevelPlot(fit2)
+vif(fit2)
+```
+
+The variance inflation factor (VIF) was conducted to check for multicollinearity. From this, it was found that the VIF values for the predictors are less than 1.5 which indicated that the predictors had some correlation. Thus, it didn't need any modification. 
+
+```{r}
+b.mod <- regsubsets(efficiency ~., data = Maya, nvmax = 5)
+res_sum <- summary(b.mod)
+res_sum
+
+```
+The above summary displays the best set of independent variables for the dependent variable "efficiency". The best model for estimating the efficiency was represented with an asterisk. From the above, it was observed that if the best model was to be estimated by 5 independent variables, then the variables would be 'assist', 'fouls', 'turnover', 'made1' and 'fgmade'. 
+
+
+```{r}
+data.frame(Adj.R2 = which.max(res_sum$adjr2),
+           CP = which.min(res_sum$cp),
+           BIC = which.min(res_sum$bic))
+```
+From these results, it was interpreted that a model with 5 independent variables was the best model.
+
+```{r}
+best_reg_model <- lm(formula = efficiency ~assist + fouls + turnover + made1 + fgmade, data = Maya)
+summary(best_reg_model)
+```
+
+The multiple linear regression model equation to estimate efficiency was efficiency = (1.2399)assist + (1.0783)fouls + (-0.6736)turnover + (1.0047)made1 + (2.2623)fgmade - 3.9971. The adjusted R-squared was 0.8707 which indicated that 87.07% of the variance in 'efficiency' can be estimated by 'assist', 'fouls', 'turnover', 'made1' and 'fgmade'. 
+
+```{r}
+set.seed(123)
+trainIndex <-createDataPartition(Maya$efficiency, p = 0.70, list = FALSE)
+train <- Maya[trainIndex,]
+test <- Maya[-trainIndex,]
+```
+
+```{r}
+fit3 <- lm(formula = efficiency ~assist + fouls + turnover + made1 + fgmade, data = train)
+summary(fit3)
+```
+The adjusted R-squared is 0.858 which indicates that 85.8% of the variance in efficiency can be estimated by 'assist', 'fouls', 'turnover', 'made1' and 'fgmade'. 
+
+```{r}
+fit4 <- lm(formula = efficiency ~assist + fouls + turnover + made1 + fgmade, data = test)
+summary(fit4)
+```
+The adjusted R-squared is 0.8636 which indicates that 86.36% of the variance in efficiency can be estimated by assist, fouls, turnover, made1 and fgmade. The multiple linear regression model equation to estimate efficiency is efficiency = (1.04224)assist + (0.08788)fouls + (0.1767)turnover + (1.07266)made1 + (2.02419)fgmade + 0.3307.
+
+```{r}
+AIC(fit4)
+BIC(fit4)
+```
+
+```{r}
+AIC(fit3,fit4)
+BIC(fit3,fit4)
+```
+
+When comparing the AIC and BIC of the train and test set, it was found that 'fit4' i.e., the test data set had a lower AIC and BIC value.
+
+### Results
+
+The multiple linear regression model was conducted on the Maya data set which was taken from the WNBA data set. From this, it was found that significant variables were 'turnover', 'fgmade', 'made1' and 'assist' with which a second model was created which gave an adjusted R-squared value of 0.8586. Numerous checks were performed to assess the assumptions. The residual vs fitted plot depicted that the residuals followed a linear pattern and the linear regression model was appropriate for the data set. From the Q-Q plot, I inferred that the data was roughly on the diagonal line, however, the residuals was not enough to declare that it was non-normally distributed. The Scale-Location Plot was used to check the homoscedasticity among the residuals and it was observed that the residuals spread wider on the x-axis. The residuals vs leverage plot displayed that there were no outliers in the data used. Also, the variance inflation factor (VIF) indicated that the predictors had some correlation as the VIF values for the predictors were less than 1.5. 
+
+After conducting the following checks, the regsubset function was performed where it was found that the model with five independent variables gave the best result. The significant variables were 'assist', 'fouls', 'turnover', 'made1' and 'fgmade' which gave an adjusted R-squared value of 0.8707. The data was split into two i.e., the train and test set. From this, it was observed that the test data set had a higher adjusted R-squared value of 0.8638 compared to the train data set which was 0.858. Also, the AIC and BIC value of the test set data was lesser than the train set data which indicated that it was a good model to estimate the future efficiency of a player. 
+
+### Interpretation
+
+The multiple linear regression model was conducted to find the effect of a player's overall match statistics on a player's future efficiency. From the above analyses, it was found that model with five independent variables i.e., assist, fouls, turnover, made1 and fgmade gave the best model to estimate the future efficiency of the player. This model gave an adjusted R-squared value of 0.8707 which indicated that 87.07% of the variance in efficiency can be estimated by assist, fouls, turnover, made1 and fgmade. When the data was split to train and test set, it was found that the test data set performed better than the train set as the adjusted R-squared value was higher than the train set and the AIC as well as the BIC value of the test set was lower than the train set which indicated that this was a good predictive model to estimate the future efficiency of a player.
+
+
+## Business Question 2 - What is the effect of a team's overall match statistics on a team winning the game?
+
+
+### Motivation
+
+A game can have two outcomes i.e., win or lose, which can change depending on various factors. As such, we wanted to explore the data and find the best predictors for our target variable "win" that will predict the wins of a particular team. To find our prediction, the logistic regression model was used. 
+
+### Research
+
+The focus of this research was to build an accurate predictive model that would predict the outcome of a game with high accuracy. As an essential part of building such a model, I aimed to provide answers to the following questions:
+
+* Which features or statistics are the most useful for predicting the outcomes?
+* What is the accuracy that I can predict the winner of each game?
+
+### Development
+
+The data used for this research was a subset of a team's statistics i.e., for Los Angeles Sparks(LAS). It consisted of the team's match statistics for each game.  
+
+```{r, message = FALSE, echo = FALSE}
+library(knitr)
+
+df <- data.frame(bucket = 1:14,
+                 Variable_Name = c("win", "team_pts", "efficiency", "assist", "fouls", "block", "steal","home", "fgmade", "made3", "made1", "defrb", "offrb", "turnover"), Description = c("Number of Wins", "Team Points", "Player Efficiency", "Number of Assists", "Number of Fouls", "Number of Blocks", "Number of Steals", "Home Stadium", "Field Goals", "Number of 3 pointers made", "Number of 1 pointers made", "Defense Rebound", "Offense Rebound", "Number of turnovers"), Data_Type = c("Integer", "Integer", "Integer",  "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer"))
+
+kable(df)
+```
+
+### Code
+
+
+```{r}
+Team_LAS <- WNBA %>% filter(team == "LAS") %>% select(win, team_pts, efficiency, assist, fouls, block, steal, home, fgmade, made3, made1, defrb, offrb, turnover)
+```
+The data set was subsetted with the team Los Angeles Sparks (LAS) game statistics. 
+
+```{r}
+ones <- Team_LAS[which(Team_LAS$win == 1),]
+zero <- Team_LAS[which(Team_LAS$win == 0),]
+set.seed(123)
+no_bs <- nrow(ones)
+zero_no_bs <- head(zero, no_bs)
+ones_no_bs <- ones
+
+#Split balanced data set to train and test sets
+r_ind <- sample(1:nrow(ones_no_bs), 0.70*no_bs)
+ones_train <- ones_no_bs[r_ind,] 
+z_train <- zero_no_bs[r_ind,]
+train_data <- rbind(ones_train, z_train)
+
+#To create test data
+test_1 <- ones_no_bs[-r_ind,]
+test_0 <- zero_no_bs[-r_ind,]
+test_data <- rbind(test_1, test_0)
+cat("Training dataset size is = [", dim(train_data), "] testing is = [", dim(test_data), "]\n")
+table(train_data$win)
+table(test_data$win)
+```
+
+To avoid overfitting the model, the data set was split into 70/30 train and test sets, where 70% of the observations were used in the training data set and 30% of the observations were used in the testing data set in order to carry out further analyses. 
+
+```{r}
+str(Team_LAS)
+```
+
+
+```{r}
+#Fitting the model
+model1 <- glm(win ~ ., data= train_data, family = binomial(link = "logit"))
+summary(model1)
+```
+
+In the above model, the train data set with all the variables were fitted into the model where it was found that the variables i.e., 'team_pts', 'efficiency', 'assist', 'fouls', 'home', 'fgmade' and 'offrb' were significant to predict the team wins and this model had an AIC of 278.34 with the difference between the two deviances at approximately 38.
+
+
+```{r}
+model2 <- glm(win ~ team_pts + efficiency + assist + fouls + home + fgmade + offrb, data= train_data, family = binomial(link = "logit"))
+model2
+```
+
+In the above model, only the significant variables i.e., team_pts, efficiency, assist, fouls, home, and fgmade were fitted into the model. The AIC of this model was 268.1 and the difference between the two deviances was approximately 36. Comparing the above two models, it can be observed that the second model performed better since it had a lower AIC than the first model. However, the second model's difference between the two deviance was slightly lower than the first model. As such, further analyses was conducted to ascertain which model would accurately predict the winning team. 
+
+```{r}
+model3 <- glm(win ~ team_pts + efficiency + assist + fouls + home + fgmade + offrb, data= test_data, family = binomial(link = "logit"))
+model3
+```
+In the above model, the test data set was fitted into the model with the significant variables. The AIC of this model was 123 and the difference between the two deviances was approximately 18.
+
+```{r}
+AICc(model1)
+AICc(model2)
+```
+
+From the above AICc function performed, it was found that the model2 performed better than the model1 as the AICc value of model2 was lower than model1.
+
+
+```{r}
+AIC(model1,model2, model3)
+BIC(model1,model2, model3)
+```
+
+To find out which model is giving better results, the AIC and BIC of the two models were compared. From this, we found that model2 was the preferred model as it had a low AIC and BIC value compared to model1. Also, when comparing model2 and model3, it was found that the testing model performed better than the training model as the AIC and BIC values were lower in the testing model.
+
+```{r}
+coef(model2)
+exp(coef(model2))
+```
+
+From the above, it can be observed that the probability of the team LAS winning the game increases by a factor of 0.06223026 for each 1 unit increase in 'team_pts' provided all the other variables remain the same. Likewise, the probability of winning the game increases by a factor of 0.12043116 for each 1 unit increase in 'efficiency', or by a factor of -0.24992092 for each 1 unit increase in 'assist',  or by a factor of -0.26518967 for each 1 unit increase in 'fouls', or by a factor of -0.21990324 for each 1 unit increase in 'fgmade', or by a factor of -0.69172926 for each 1 unit increase in 'home', or by a factor of -0.31123123 for each 1 unit increase in 'offrb'.
+
+
+```{r}
+#Creating a dataset to observe the probability changes for the different values
+pr <- data.frame((team_pts = c(min(Team_LAS$team_pts), mean(Team_LAS$team_pts), max(Team_LAS$team_pts))), (efficiency = c(min(Team_LAS$efficiency), mean(Team_LAS$efficiency), max(Team_LAS$efficiency))), (assist = c(min(Team_LAS$assist), mean(Team_LAS$assist), max(Team_LAS$assist))), (fouls = c(min(Team_LAS$fouls), mean(Team_LAS$fouls), max(Team_LAS$fouls))), (fgmade = c(min(Team_LAS$fgmade), mean(Team_LAS$fgmade), max(Team_LAS$fgmade))), (home = c(min(Team_LAS$home), mean(Team_LAS$home), max(Team_LAS$home))), (offrb = c(min(Team_LAS$offrb), mean(Team_LAS$offrb), max(Team_LAS$offrb))))
+pr$probability <- predict(model2, pr, type = "response")
+pr
+```
+
+From the results, it was observed that the minimum values probability was 0.48, mean values probability was 0.50 and the max values probability was 0.12. 
+
+
+
+```{r}
+train_data$win <- as.factor(train_data$win)
+#To make predictions on the data
+prob_train <- predict(model2, newdata = train_data, type = "response")
+pred <- as.factor(ifelse(prob_train >= 0.5, 1, 0))
+
+#Confusion Matrix - For Model Accuracy
+confusionMatrix(pred, train_data$win, positive = "1")
+```
+
+In the above matrix, it can be inferred that the True Positive value is 75, the True Negative value is 50, the False Positive value is 34 and the False Negative value is 29. The Accuracy was 0.6971 which indicated that from the positive and negative classes, 69.71% of the data were predicted accurately. The Sensitivity aka True Positive rate or Recall is 0.7212 which indicated that from all the positive classes, 72.12% were predicted accurately and the Specificity aka the False Positive rate is 0.6731 which indicated that from all the negative classes, 67.31% were predicted accurately. The Precision aka the Positive Pred value is 0.6881 which indicated that from all the classes that were predicted as positive, 68.81% of the data was positive. The Negative Pred value is 0.7071 which indicated that from all the classes that were predicted as negative, 70.71% of the data was negative. 
+
+```{r}
+test_data$win <- as.factor(test_data$win)
+prob_test <- predict(model2, newdata = test_data, type = "response")
+pred2 <- as.factor(ifelse(prob_test >= 0.5, 1, 0))
+
+#Confusion Matrix - For Model Accuracy
+confusionMatrix(pred2, test_data$win, positive = "1")
+```
+
+In the above matrix, it can be inferred that the True Positive value was 26, the True Negative value was 30, the False Positive value is 15 and the False Negative value is 19. The Accuracy was 0.6222 which indicated that from the positive and negative classes, 62.22% of the data were predicted accurately. The Sensitivity aka True Positive rate or Recall was 0.5778 which indicated that from all the positive classes, 57.78% of the data were predicted accurately and the Specificity aka the False Positive rate is 0.6667 which indicated that from all the negative classes, 66.67% of the data were predicted accurately. The Precision aka the Positive Pred value is 0.6341 which indicated that from all the classes that were predicted as positive, 63.41% of the data was positive. The Negative Pred value is 0.6122 which indicated that from all the classes that were predicted as negative, 61.22% of the data was negative. 
+
+```{r}
+ROC1 <- roc(test_data$win, prob_test)
+#ROC_ch <- coords(ROC1, "best")
+plot(ROC1, col = "blue", ylab = "Sensitivity - TP Rate", xlab = "Specificity - FP Rate", main = "ROC Curce", legacy.axes = TRUE)
+```
+
+The above plot indicates that the model moves upwards and has a curve which indicates that the model is good.
+
+```{r}
+auc <- auc(ROC1)
+auc
+```
+
+The area under the curve is the area that is between the blue line and the grey diagonal line. The AUC of our model is approximately 0.69 which indicates that it has a good measure of separability. 
+
+### Results
+The logistic regression model was conducted on the Team_LAS data set which was taken from the WNBA data set. The data was validated and split into two i.e., the train and test set. From this, we found that significant variables were 'team_pts', 'efficiency', 'assist', 'fouls', 'home', 'fgmade', and 'offrb' with which a second model was created which gave an AIC of 268.1. Numerous checks were performed to assess which model performed better. By comparing the AIC and BIC of the models, it was found that model2 performed better than model1 as model 2 had a low AIC and BIC values as compared to model1. 
+
+The confusion matrix was conducted for the train and test set from which it was found that in the training data set, the Accuracy was 0.6971 which indicated that from the positive and negative classes, 69.71% of the data were predicted accurately. The Sensitivity aka True Positive rate or Recall is 0.7212 which indicated that from all the positive classes, 72.12% were predicted accurately and the Specificity aka the False Positive rate is 0.6731 which indicated that from all the negative classes, 67.31% were predicted accurately. The Precision aka the Positive Pred value is 0.6881 which indicated that from all the classes that were predicted as positive, 68.81% of the data was positive. The Negative Pred value is 0.7071 which indicated that from all the classes that were predicted as negative, 70.71% of the data was negative. Also, from the test data set, the Accuracy was 0.6222 which indicated that from the positive and negative classes, 62.22% of the data were predicted accurately. The Sensitivity aka True Positive rate or Recall was 0.5778 which indicated that from all the positive classes, 57.78% of the data were predicted accurately and the Specificity aka the False Positive rate is 0.6667 which indicated that from all the negative classes, 66.67% of the data were predicted accurately. The Precision aka the Positive Pred value is 0.6341 which indicated that from all the classes that were predicted as positive, 63.41% of the data was positive. The Negative Pred value is 0.6122 which indicated that from all the classes that were predicted as negative, 61.22% of the data was negative. The ROC curve was plotted and the Area under the curve (AUC) was 0.69 which indicated that the model had a good measure of separability. 
+
+### Interpretation
+
+The logistic regression model was conducted to find the effect of a team's overall match statistics on the team winning the game. From the above analyses, it was found that significant variables were 'team_pts', 'efficiency', 'assist', 'fouls', 'home', 'fgmade', and 'offrb' which gave the best model to predict the team wins. The best performing model was model2 (268.1, 294.8) as it had a low AIC and BIC value as compared to model1 (278.3, 325.1). The confusion matrix was conducted for the training and testing sets, where it was found that the test set had an accuracy of 62.22%, the recall had 57.78% of the data that were accurately predicted from both, the positive and negative classes. The precision in the model consisted of 63.41% of the data that was accurately predicted as positive and the negative pred value indicated that 61.22% of the data was accurately predicted as negative. The ROC curve was plotted where the area under the curve was 0.69 which indicated that the model was good. 
+
+
+# Conclusion
+
+From this project, the following conclusions were made:
+* There are 4032 observations and 26 variables in total. There were a total of 152 players across 12 teams. The team points ranged between 46 and 112 whereas, the opponent points range between 46 and 112. The longest time a player played a match was for 52 minutes. The minimum points a player scored in a game was 0 and the maximum points a player scored in a game was 48. The efficiency of these players ranged between -7 and 44. There were no duplicate values.
+
+* The following findings were found after conducting the EDA - there were approximately 60% of home games that were won in the series, the variables 'team_pts', 'opp_pts' and 'efficiency' were normally distributed. The variables 'minutes' and 'fgmade', 'minutes' and 'fgatt', 'fgmade' and 'fgatt', 'minutes' and 'points', 'minutes' and 'efficiency', 'fgmade' and 'points', 'fgmade' and 'efficiency', 'fgatt' and 'points', 'fgatt' and 'efficiency', 'made3' and 'att3', 'made1' and 'att1', 'offrb' and 'totrb', and 'defrb' and 'totrr', 'points' and 'efficiency', 'points' and 'made1', 'efficiency' and 'made1', 'fgatt' and 'made1', 'points' and 'att1', 'efficiency' and 'att1', 'fgatt' and 'att1', 'efficiency' and 'defrb', 'fgmade' and 'totrb', 'fgatt' and 'totrb', as well as 'efficiency' and 'totrb', 'efficiency' and 'made3', 'efficiency' and 'made1', 'fgmade' and 'made1', 'efficiency' and 'made3', and 'fgmade' and 'made3' have a strong positive relationship. The variables 'fgmade' and 'assist', 'made3' and 'assist', 'turnover' and 'assist', as well as 'block' and 'steal' have a strong negative relationship. It was also found that from the Team LAS, Candace Parker was the best player on the basis of highest scored points at 34 followed by Nneka Ogwumike and Kristi Toliver and the best player based on efficiency was Nneka Ogwumike followed by Candace Parker and Kristi Toliver. 
+
+* The multiple linear regression model was conducted on the Maya data set which was taken from the WNBA data set. From this, it was found that significant variables were 'turnover', 'fgmade', 'made1' and 'assist' with which a second model was created which gave an adjusted R-squared value of 0.8586 which indicated that 85.86% of the variance in efficiency can be estimated by 'fgmade', 'made1', 'turnover' and 'assist'. 
+
+* The residual vs fitted plot depicted that the residuals followed a linear pattern and the linear regression model was appropriate for the data set. From the Q-Q plot, it could be inferred that the data was roughly on the diagonal line. However, the residuals was not enough to declare that it was non-normally distributed. The Scale-Location Plot was used to check the homoscedasticity among the residuals and it was observed that the residuals spread wider on the x-axis. The residuals vs leverage plot displayed that there weren't any outliers in the data. Also, the variance inflation factor (VIF) indicated that the predictors had some correlation as the VIF values for the predictors were less than 1.5. 
+
+* The regsubset function was performed where it was found that the model with five independent variables gave the best result. The significant variables were 'assist', 'fouls', 'turnover', 'made1' and 'fgmade' which gave an adjusted R-squared value of 0.8707 which indicated that 87.07% of the variance in efficiency can be estimated by 'assist', 'fouls', 'turnover', 'made1' and 'fgmade'. The data was split into two i.e., the train and test set. From this, we observed that the test data set had a higher adjusted R-squared value of 0.8638 compared to the train data set which was 0.858. Also, the AIC and BIC value of the test set data was lesser than the train set data which indicated that it was a good model to estimate the future efficiency of a player.
+
+* The logistic regression model was conducted on the Team_LAS data set which was taken from the WNBA data set. The data was validated and split into two i.e., the train and test set. From the first model, it was found that the significant variables which were 'team_pts', 'efficiency', 'assist', 'fouls', 'home', 'fgmade', and 'offrb' with which a second model was created which gave an AIC of 268.1. 
+
+* To assess which model performed better, the AIC and BIC values of the models were compared, where it was found that the model2 performed better than model1 as it had a lower AIC and BIC values as compared to model1. 
+
+* The confusion matrix was conducted for the train and test set from which it was found that in the training data set, the Accuracy was 0.6971 which indicated that from the positive and negative classes, 69.71% of the data were predicted accurately. The Sensitivity aka True Positive rate or Recall is 0.7212 which indicated that from all the positive classes, 72.12% were predicted accurately and the Specificity aka the False Positive rate is 0.6731 which indicated that from all the negative classes, 67.31% were predicted accurately. The Precision aka the Positive Pred value is 0.6881 which indicated that from all the classes that were predicted as positive, 68.81% of the data was positive. The Negative Pred value is 0.7071 which indicated that from all the classes that were predicted as negative, 70.71% of the data was negative.
+
+* From the test data set, the Accuracy was 0.6222 which indicated that from the positive and negative classes, 62.22% of the data were predicted accurately. The Sensitivity aka True Positive rate or Recall was 0.5778 which indicated that from all the positive classes, 57.78% of the data were predicted accurately and the Specificity aka the False Positive rate is 0.6667 which indicated that from all the negative classes, 66.67% of the data were predicted accurately. The Precision aka the Positive Pred value is 0.6341 which indicated that from all the classes that were predicted as positive, 63.41% of the data was positive. The Negative Pred value is 0.6122 which indicated that from all the classes that were predicted as negative, 61.22% of the data was negative. The ROC curve was plotted and the Area under the curve (AUC) was 0.69 which indicated that the model had a good measure of separability. 
+
+
+# References
+* Sports Statistics. (n.d.). WNBA 2014 player stats by game. Retrieved on February 5, 2022 from https://sports-statistics.com/sports-data/sports-data-sets-for-data-modeling-visualization-predictions-machine-learning/
+* kassambara. (2018, March 11). Regression Model Diagnostics. Retrieved on February 9, 2022 from http://www.sthda.com/english/articles/39-regression-model-diagnostics/161-linear-regression-assumptions-and-diagnostics-in-r-essentials/#example-of-data.
+* Bevans, Rebecca. (2020, January 28). Choosing the Right Statistical Test | Types and Examples. Retrieved on February 9, 2022 from https://www.scribbr.com/statistics/statistical-tests/. 
+* JournalDev. (n.d.). Confusion Matrix in R | A Complete Guide. Retrieved on February 18, 2022 from https://www.journaldev.com/46732/confusion-matrix-in-r.
