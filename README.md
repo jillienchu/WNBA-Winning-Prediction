@@ -22,6 +22,10 @@ To conduct this project, the R programming language was used on RStudio. In this
 * magrittr
 * lmtest
 
+## :sparkles: Business Queries
+* What is the effect of a player's overall match statistics on a player's future efficiency?
+* What is the effect of a team's overall match statistics on a team winning the game?
+
 ## :sparkles: Predictive Models
 To answer the business queries, two predictive models were used.
 * Linear Regression Model 
