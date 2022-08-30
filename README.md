@@ -1,10 +1,10 @@
 # WNBA - Winning Team Prediction and Player Analysis
 
 ## :pushpin: Abstract
-This project aims to predict the likelihood of a team winning, analyzes the impact of a player's overall match statistics on their future efficiency and the impact of a team's overall statistics on a team winning the game. 
+This project aims to predict the likelihood of a team winning, analyzes the impact of a player's overall match statistics on their future efficiency and the impact of a team's overall statistics on a team winning the game. The WNBA 2014 data set used for this analysis can be found here: [https://sports-statistics.com/sports-data/sports-data-sets-for-data-modeling-visualization-predictions-machine-learning/](https://sports-statistics.com/sports-data/sports-data-sets-for-data-modeling-visualization-predictions-machine-learning/)
 
 ## :bulb: Features
-To conduct this project, the R programming language was used. In this, the following packages were used:
+To conduct this project, the R programming language was used on RStudio. In this, the following packages were used for analyzing and plotting the data:
 * stargazer
 * knitr
 * psych
